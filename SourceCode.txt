@@ -1,0 +1,273 @@
+package com.example.phase3sec3;
+
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import com.example.phase3sec3.model.User;
+//This class serves as a business logic for user authentication
+public class Authentication {
+	public static Set<User> userList = new HashSet<>();
+
+	private User currentSessionUser = null;
+
+	public Boolean login(String userName, String password) {
+		AtomicBoolean userExists = new AtomicBoolean(false);
+
+		userList.stream().filter(x -> x.getUserName().equals(userName) && x.getPassword().equals(password)).findFirst()
+				.ifPresent(x -> {
+					userExists.set(true);
+					currentSessionUser = x;
+				});
+
+		return userExists.get();
+	}
+
+	public String getRole() {
+		if (currentSessionUser != null) {
+			return currentSessionUser.getRole();
+		}
+		return null;
+	}
+
+	public String getUserName() {
+		if (currentSessionUser != null) {
+			return currentSessionUser.getUserName();
+		}
+		return null;
+	}
+
+
+	public void logout() {
+		currentSessionUser = null;
+	}
+
+}
+
+-----------------------------------------------------------------------------------------------------------
+
+package com.example.phase3sec3;
+
+//This class serves as business logic for user authorization
+public class Authorization {
+
+	private Authentication authentication;
+
+	public Authorization(Authentication authentication) {
+
+		this.authentication = authentication;
+	}
+
+	public boolean hasAccess(String page) {
+
+		
+		if(authentication != null && authentication.getRole() != null) {
+			if(page.equals("welcome")) {
+				return true;
+			} else if(page.equals("admin")) {
+				if(authentication.getRole().equals("Admin")) {
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+	
+	
+
+}
+
+---------------------------------------------------------------------------------------------------------
+
+package com.example.phase3sec3;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+//This serves as an entry point for my application(Instead, run from test folder in "Phase3sec3ApplicationTest.java")
+@SpringBootApplication
+public class Phase3sec3Application {
+
+	public static void main(String[] args) {
+		SpringApplication.run(Phase3sec3Application.class, args);
+	}
+
+}
+
+---------------------------------------------------------------------------------------------------------
+
+package com.example.phase3sec3.model;
+
+import lombok.Builder;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+//This class serves as the model for the users information 
+@Getter
+@Builder
+public class User {
+	
+	private String userName;
+	
+	private String password;
+	
+	private String role;
+
+}
+
+--------------------------------------------------------------------------------------------------------
+
+package com.example.phase3sec3;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import com.example.phase3sec3.model.User;
+
+//This test class is used to test my user authorization within the application
+public class AuthenticationTest {
+	
+	@BeforeEach
+	public void setup() {
+		Authentication.userList.add(User.builder().userName("Matt").password("pass").role("Admin").build());
+		Authentication.userList.add(User.builder().userName("Donny").password("pass").role("User").build());
+		Authentication.userList.add(User.builder().userName("Chris").password("pass").role("Developer").build());
+		Authentication.userList.add(User.builder().userName("Patt").password("pass").role("Tester").build());
+	}
+	
+	@Test
+	public void testLogin() {
+		Authentication authentication = new Authentication();
+		
+		assertEquals(true, authentication.login("Matt", "pass"));
+	}
+	
+	@Test
+	public void testWrongUserLogin() {
+		Authentication authentication = new Authentication();
+		
+		assertEquals(false, authentication.login("Omar", "pass"));
+	}
+
+	@Test
+	public void testUserAssert() {
+		Authentication authentication = new Authentication();
+		
+		assertEquals(true, authentication.login("Matt", "pass"));
+		
+		assertEquals("Matt", authentication.getUserName());
+	}
+	
+	@Test
+	public void testRoleAssert() {
+		Authentication authentication = new Authentication();
+		
+		assertEquals(true, authentication.login("Matt", "pass"));
+		
+		assertEquals("Admin", authentication.getRole());
+	}
+
+	@Test
+	public void testLogout() {
+		Authentication authentication = new Authentication();
+		
+		assertEquals(true, authentication.login("Matt", "pass"));
+		
+		authentication.logout();
+		
+		assertEquals(null, authentication.getRole());
+	}
+
+}
+
+--------------------------------------------------------------------------------------------------------------
+
+package com.example.phase3sec3;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import com.example.phase3sec3.model.User;
+//This test class is used to test my user authentication within the application
+public class AuthorizationTest {
+	
+	@BeforeEach
+	public void setup() {
+		Authentication.userList.add(User.builder().userName("Matt").password("pass").role("Admin").build());
+		Authentication.userList.add(User.builder().userName("Donny").password("pass").role("User").build());
+		Authentication.userList.add(User.builder().userName("Chris").password("pass").role("Developer").build());
+		Authentication.userList.add(User.builder().userName("Patt").password("pass").role("Tester").build());
+	}
+	
+	@Test
+	public void testWelcomePageAccess() {
+		Authentication authentication = new Authentication();
+		
+		assertEquals(true, authentication.login("Matt", "pass"));
+		
+		Authorization authorization = new Authorization(authentication);
+		
+		assertEquals(true, authorization.hasAccess("welcome"));
+	}
+	
+	@Test
+	public void testAdminPageAccess() {
+		Authentication authentication = new Authentication();
+		
+		assertEquals(true, authentication.login("Matt", "pass"));
+		
+		Authorization authorization = new Authorization(authentication);
+		
+		assertEquals(true, authorization.hasAccess("admin"));
+
+	}
+	
+	@Test
+	public void testAdminPageNotAccessable() {
+		Authentication authentication = new Authentication();
+		
+		assertEquals(true, authentication.login("Patt", "pass"));
+		
+		Authorization authorization = new Authorization(authentication);
+		
+		assertEquals(false, authorization.hasAccess("admin"));
+
+	}
+
+
+	@Test
+	public void testWelcomePageAccessWithoutLogin() {
+		Authentication authentication = new Authentication();
+		
+		assertEquals(true, authentication.login("Matt", "pass"));
+		
+		authentication.logout();
+		
+		Authorization authorization = new Authorization(authentication);
+		
+		assertEquals(false, authorization.hasAccess("admin"));
+
+		
+	}
+}
+
+------------------------------------------------------------------------------------------------------------
+
+package com.example.phase3sec3;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+//This is the entry point for testing the application
+@SpringBootTest
+class Phase3sec3ApplicationTests {
+
+	@Test
+	void contextLoads() {
+	}
+
+}
